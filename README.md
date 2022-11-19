@@ -28,7 +28,7 @@ ssh someinternalhost
 то решение такое:
 Чтобы подключаться по алиасу нужно в каталоге .ssh создать файл config и поместить туда информацию
 ```bash
- ### First jump host. Directly reachable
+### First jump host. Directly reachable
 Host bastion
   HostName 35.228.62.55
  
