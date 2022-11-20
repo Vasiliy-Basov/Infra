@@ -1,0 +1,1 @@
+gcloud compute instances create reddit-app1 --boot-disk-size=10GB --image=ubuntu-1604-xenial-v20170815a --image-project=ubuntu-os-cloud --machine-type=g1-small --tags puma-server --restart-on-failure --metadata startup-script=”wget -O - https://raw.githubusercontent.com/Vasiliy-Basov/GCP/main/startup_1604.sh | bash”
