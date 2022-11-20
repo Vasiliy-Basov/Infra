@@ -1,0 +1,44 @@
+{
+    "variables": {
+            "project_id": "infra-368512",
+            "source_image_family": "reddit-full",
+            "machine_type": "f1-micro",
+            "source_image": "reddit-base-1668709415"
+    },
+    "builders": [
+        {
+            "type": "googlecompute",
+            "project_id": "{{user `project_id`}}",
+            "image_name": "reddit-full-{{timestamp}}",
+	        "image_description": "Bake image for puma application",
+            "image_family": "{{user `source_image_family`}}",
+            "network": "default",
+	        "tags": "puma-server",
+            "source_image": "{{user `source_image`}}",
+            "zone": "europe-west1-b",
+            "ssh_username": "baggurd",
+	        "disk_type": "pd-standard",
+	        "disk_size": 20,
+            "machine_type": "{{user `machine_type`}}"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "file",
+            "source": "files/puma.service",
+            "destination": "/tmp/puma.service"
+
+        },
+    	{
+            "type": "shell",
+            "inline": [
+                "sudo mv /tmp/puma.service /etc/systemd/system/puma.service"
+		]
+        },
+        {
+            "type": "shell",
+            "script": "files/deploy_reddit.sh",
+            "execute_command": "sudo {{.Path}}"
+        }
+    ]
+}
