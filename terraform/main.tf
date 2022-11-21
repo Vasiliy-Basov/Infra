@@ -4,15 +4,15 @@ terraform {
   required_providers {
     google = {
       source = "hashicorp/google"  # Указываем провайдера терраформ
-      # version = "~> 4.43.1"    # можем также указать версию
+      # version = "~> 4.43.1"    # можем также указать версию провайдера
     }
   }
 }
 
 provider "google" {               # Указываем провайдера
   # ID проекта
-  project = "infra-368512"
-  region  = "europe-west1"
+  project = var.project
+  region  = var.region
 }
 
 # Добавляем ssh ключ для подключения к нашим VM сам ключ находится в variables.tf
@@ -25,7 +25,7 @@ resource "google_compute_project_metadata" "ssh_keys" {
 resource "google_compute_instance" "app" {
   name         = "reddit-app"
   machine_type = "g1-small"
-  zone         = "europe-west1-b"
+  zone         = var.zone
   tags = ["reddit-app"]  # можем определить теги
 
   # определение загрузочного диска
@@ -50,9 +50,10 @@ resource "google_compute_instance" "app" {
     type = "ssh"
     user = "baggurd"
     agent = false
+    #ip адрес хоста берется из файла terraform.tfstate также можно брать и другие переменные
     host = google_compute_instance.app.network_interface[0].access_config[0].nat_ip
     # путь до приватного ключа
-    private_key = file("id_rsa")
+    private_key = var.private_key
   }
 
   # Копируем файл с нашей локальной машины на удаленную
