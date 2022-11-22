@@ -70,8 +70,40 @@ someinternalhost
 - создал скрипт install_mongodb.sh
 - создал скрипт deploy.sh
 
+
 **Задача:**
 В качестве доп. задания используйте созданные ранее скрипты для создания , который будет запускаться при создании инстанса. Передавать startup скрипт необходимо как дополнительную опцию уже использованной ранее команде gcloud  
+Ключевые моменты:
+- startup-скрипты запускаются от root'а (https://cloud.google.com/compute/docs/startupscript#startup_script_execution), соответственно нужно держать в голове, что и от чьего имени мы хотим исполнить. Для исполнения команд от имени другого пользователя подойдет runuser или su (https://www.cyberciti.biz/open-source/command-line-hacks/linux-run-command-as-different-user/). Пример:
+```
+runuser -l appuser -c 'git clone -b monolith https://github.com/express42/reddit.git'
+runuser -l appuser -c 'cd reddit && bundle install'
+runuser -l appuser -c 'cd reddit && puma -d'
+```
+```
+appuser@reddit-app:~$ ps aux | grep 9292
+appuser   9434  1.0  1.5 513788 26876 ?        Sl   21:53   0:00 puma 3.10.0 (tcp://0.0.0.0:9292) [reddit]
+appuser   9459  0.0  0.0  12916  1088 pts/0    S+   21:54   0:00 grep --color=auto 9292
+```
+- обработчик startup-скриптов не поддерживает не-ascii символы - в /var/log/syslog сыпалось множество ошибок, когда я в скрипте оставил комментарии на русском;
+- отслеживать выполнение startup-скрипта можно в /var/log/syslog
+```
+tail -f /var/log/syslog
+Mar 27 21:53:34 reddit-app systemd[1]: Started Session c3 of user appuser.
+Mar 27 21:53:34 reddit-app startup-script: INFO startup-script:   Puma starting in single mode...
+Mar 27 21:53:34 reddit-app startup-script: INFO startup-script: * Version 3.10.0 (ruby 2.3.1-p112), codename: Russell's Teapot
+Mar 27 21:53:34 reddit-app startup-script: INFO startup-script: * Min threads: 0, max threads: 16
+Mar 27 21:53:34 reddit-app startup-script: INFO startup-script: * Environment: development
+Mar 27 21:53:34 reddit-app startup-script: INFO startup-script: * Daemonizing...
+Mar 27 21:53:34 reddit-app startup-script: INFO startup-script: Return code 0.
+Mar 27 21:53:34 reddit-app startup-script: INFO Finished running startup scripts.
+Mar 27 21:53:34 reddit-app systemd[1]: Started Google Compute Engine Startup Scripts.
+Mar 27 21:53:34 reddit-app systemd[1]: Startup finished in 2.857s (kernel) + 1min 31.747s (userspace) = 1min 34.605s.
+```
+- скрипт может храниться локально на машине с gcloud-клиентом (startup-script=), в bucket на Google Cloud Storage (startup-script-url=), в метаданных instance, а также может быть передан в виде текста. В качестве дополнительного параметра к gcloud также необходимо указать "--metadata-from-file".
+```
+gcloud compute instances create reddit-app --boot-disk-size=10GB --image-family ubuntu-1604-lts --image-project=ubuntu-os-cloud --machine-type=g1-small --tags puma-server --restart-on-failure --metadata-from-file startup-script=install_all.sh
+
 Решение:  
 Создал скрипт startup_1604.sh, который запускается автоматически после запуска инстанса. В скрипт GCPInstanceeInstall1604.bat создания инстанса была добавлена команда: 
 ```bash
@@ -147,3 +179,119 @@ packer build -var-file=variables.json ubuntu.json
 Создайте shell-скрипт с названием create-reddit-vm.bat. Запишите в него команду которая запустит виртуальную машину из образа подготовленного вами в рамках этого ДЗ, из семейства reddit-full  
 Решение:  
 Создан скрипт create-reddit-vm.bat, который выполняет создание инстанса VM на основе необходимого образа
+
+**ВЫПОЛНЕНО ДЗ №6**
+
+В данной работе мы настроили деплой нашего приложения посредством terraform. Структура конфигурации:
+main.tf - виртуальная машина, правило firewall, provisioners, ssh-ключи;
+variables.tf - переменные, используемые в main.tf;
+terraform.tfvars - значения, подставляемые в переменные;
+outputs.tf - переменные, значение у которых появляется уже после запуска машин (e.g. IP-адрес)
+
+**Задача с одной звездочкой:**  
+Опишите в коде терраформа добавление ssh ключа пользователя appuser1 в метаданные проекта. Выполните terraform apply и проверьте результат (публичный ключ можно брать пользователя appuser). Опишите в коде терраформа добавление ssh ключей нескольких пользователей в метаданные проекта (можно просто один и тот же публичный ключ, но с разными именами пользователей, например appuser1, appuser2 и т.д.). Выполните terraform apply и проверьте результат  
+Решение:  
+В файл main.tf добавлен ресурс для ключей пользователей appuser1 и appuser2:
+```bash
+resource "google_compute_project_metadata" "ssh_keys" {
+  metadata = {
+    # ssh-keys = "baggurd:${var.public_key} baggurd"
+    # ssh-keys = "baggurd:${file(var.public_key)}\nappuser2:${file(var.public_key)}"
+    # chomp removes newline characters at the end of a string.
+    # This can be useful if, for example, the string was read from a file that has a newline character at the end.
+    ssh-keys = "baggurd:${chomp(file(var.public_key))}"
+  }
+}
+```
+Это позволяет коннектиться к серверу двумя различными логинами.  
+**Задача:**  
+* Определите input переменную для приватного ключа, использующегося в определении подключения для провижинеров (connection);
+* Определите input переменную для задания зоны в ресурсе "google_compute_instance" "app". У нее должно быть значение по умолчанию;
+* Отформатируйте все конфигурационные файлы используя команду terraform fmt;
+* Так как в репозиторий не попадет ваш terraform.tfvars, то нужно сделать рядом файл terraform.tfvars.example, в котором будут указаны переменные для образца
+  
+Решение:    
+* определена переменная private_key_path
+* определена переменная zone со значением по умолчанию "europe-west1-b"
+* выполнено форматирование посредством terraform fmt
+* создан файл terraform.tfvars.example и указаны переменные
+  
+**Задача с одной звездочкой:**  
+Добавьте в веб интерфейсе ssh ключ пользователю appuser_web в метаданные проекта. Выполните terraform apply и проверьте результат Какие проблемы вы обнаружили?   
+Решение:  
+При выполнении terraform apply добавленные в web интерфейсы ключи слетают.
+  
+**Задача с двумя звездочками:**  
+В данный момент у нас с помощью terraform создается один инстанс с запущенным приложением и правило для firewall.  
+Задания:  
+Создайте файл lb.tf и опишите в нем в коде terraform создание HTTP балансировщика, направляющего трафик на наше развернутое приложение на инстансе reddit-app. Проверьте доступность приложения по адресу балансировщика. Добавьте в output переменные адрес балансировщика.
+  
+Решение:    
+Создан файд lb.tf, в котором заданы ресурсы:
+```bash
+resource "google_compute_address" "external_ip_address"
+resource "google_compute_forwarding_rule" "loadbalancer" 
+resource "google_compute_target_pool" "loadbalancer" 
+resource "google_compute_http_health_check" "default" 
+```
+отвечающие за работу балансировщика.    
+При вызове команды terraform refresh будет дополнительно выводиться адрес балансировщика в виде:
+```bash
+Outputs:
+
+lb_external_ip = 34.77.232.88
+```
+в таком случае можно выполнить проверку доступности через балансировщик командой:
+```bash
+curl http://34.77.232.88:9292
+```
+
+**Задача с двумя звездочками:**  
+Добавьте в код еще один terraform ресурс для нового инстанса приложения, например reddit-app2, добавьте его в балансировщик и проверьте, что при остановке на одном из инстансов приложения (например systemctl stop puma), приложение продолжает быть доступным по адресу балансировщика; Добавьте в output переменные адрес второго инстанса; Какие проблемы вы видите в такой конфигурации приложения? Добавьте описание в README.md.  
+Решение:   
+В файле main.tf добавлен копипастом кусок кода вида:
+```bash
+resource "google_compute_instance" "app2" {
+  name         = "reddit-app2"
+  machine_type = "g1-small"
+```
+Основаная проблема ткого подхода в том, что приходится делать избыточное копирование кусков кода, что загромождает код и логику и может приводить к ошибкам из-за сложной поддержки
+  
+**Задача с двумя звездочками:**  
+Как мы видим, подход с созданием доп. инстанса копированием кода выглядит нерационально, т.к. копируется много кода. Удалите описание reddit-app2 и попробуйте подход с заданием количества инстансов через параметр ресурса count. Переменная count должна задаваться в параметрах и по умолчанию равна 1.  
+
+### Задание с ** (стр. 55)
+Задание:
+Как мы видим, подход с созданием доп. инстанса копированием кода выглядит нерационально, т.к. копируется много кода. Удалите описание reddit-app2 и попробуйте подход с заданием количества инстансов через параметр ресурса count. Переменная count должна задаваться в параметрах и по умолчанию равна 1.
+
+Решение:
+main.tf
+```
+resource "google_compute_instance" "app" {
+  count = var.number_of_instances
+  name         = "reddit-app-${count.index}"
+  [...]
+}
+```
+=> Здесь основное отличие будет состоять в том, что мы будет к имени автоматически добавлять номер instance через ${count.index}
+
+variables.tf
+```
+variable "number_of_instances" {
+  description = "Number of reddit-app instances (count)"
+  default     = 1
+}
+```
+
+terraform.tfvars
+```
+number_of_instances = 2
+```
+
+outputs.tf
+```
+output "Global_Forwarding_Rule_IP" {
+  value = google_compute_forwarding_rule.loadbalancer.ip_address
+}
+```
+=> Чтобы output-переменные генерировались для каждого созданного instance, после указания имени ресурса terraform, необходимо добавить .*. (google_compute_instance.app.*.) и в секции instances google_compute_target_pool убрать [].
