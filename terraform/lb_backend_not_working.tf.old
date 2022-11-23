@@ -1,0 +1,68 @@
+# Creation of a loadbalancer
+# https://www.terraform.io/docs/providers/google/r/compute_forwarding_rule.html
+# https://cloud.google.com/load-balancing/docs/https/setting-up-https
+
+# Создаем Instance Group. Группа для балансировки нагрузки
+resource "google_compute_instance_group" "ig-reddit-app" {
+  name        = "ig-reddit-app"
+  description = "Reddit app instance group"
+  # Добавляем наши Instance в Instance-group
+  instances = google_compute_instance.app.*.self_link
+
+  # Создаём named-порт, по которому балансировщик будет дальше обращаться к instance. При обращении по HTTP, лучше порт назвать http.
+  named_port {
+    name = "http"
+    port = "9292"
+  }
+
+  zone = var.zone
+}
+# Создаём HTTP health-check.
+resource "google_compute_http_health_check" "reddit-http-basic-check" {
+  name         = "reddit-http-basic-check"
+  request_path = "/"
+  port         = 9292
+}
+
+# Создаём backend service. Его функция состоит в том, чтобы измерять производительность и доступность
+# (как самой машины, так и ресурсов) у всех instance в instance group. При необходимости, трафик перенаправляется на другую машину.
+# $ gcloud compute backend-services create video-service --protocol HTTP --health-checks reddit-http-basic-check --global --port-name http
+resource "google_compute_backend_service" "bs-reddit-app" {
+  name        = "bs-reddit-app"
+  description = "Backend service for reddit-app"
+  #  Важно: Если мы выберем протокол HTTP и при этом забудем указать port-name,
+  # то backend всё равно автоматически привяжется к порту с именем http, даже если он не существует
+  port_name  = "http"
+  protocol   = "HTTP"
+  enable_cdn = false
+  # Добавляем instance group как backend в backend-сервис, при этом указываем режим балансировки и
+  # триггер по нагрузке, который в потенциале может использоваться для autoscale.
+  backend {
+    group           = google_compute_instance_group.ig-reddit-app.self_link
+    balancing_mode  = "UTILIZATION"
+    max_utilization = 0.8
+  }
+  health_checks = [google_compute_http_health_check.reddit-http-basic-check.self_link]
+}
+
+#Задаем URL-map для перенаправления входящих запросов к соответствующему backend-сервису.
+#Есть возможность задавать path-rules. В нашем случае, весь трафик, не попавший под остальные url-maps будет уходить к video-service.
+resource "google_compute_url_map" "urlmap-reddit-app" {
+  name            = "urlmap-reddit-app"
+  description     = "URL-map to redirect traffic to the backend service"
+  default_service = google_compute_backend_service.bs-reddit-app.self_link
+}
+# Создаем target HTTP proxy для перенаправления запросов, соответствующих URL map
+resource "google_compute_target_http_proxy" "http-lb-proxy-reddit-app" {
+  name        = "http-lb-proxy-reddit-app"
+  description = "Target HTTP proxy"
+  url_map     = google_compute_url_map.urlmap-reddit-app.self_link
+}
+#Создаем правило для перенаправления входящего трафика к нашему прокси.
+#При необходимости, можно в будущем добавить отдельное правило под IPv6 внутри GСP трафик уже в виде IPv4 будет маршрутизироваться).
+resource "google_compute_global_forwarding_rule" "fr-reddit-app" {
+  name        = "website-forwarding-rule"
+  description = "Forwarding rule"
+  target      = google_compute_target_http_proxy.http-lb-proxy-reddit-app.self_link
+  port_range  = "80"
+}
