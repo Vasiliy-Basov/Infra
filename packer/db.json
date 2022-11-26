@@ -10,13 +10,13 @@
         {
         "type": "googlecompute",
         "project_id": "{{user `project_id`}}",
-        "image_name": "reddit-base-{{timestamp}}",
-        "image_family": "reddit-base",
+        "image_name": "reddit-db-{{timestamp}}",
+        "image_family": "reddit-db-base",
         "source_image": "{{user `source_image`}}",
         "zone": "europe-west1-b",
         "ssh_username": "baggurd",
         "machine_type": "{{user `machine_type`}}",
-        "image_description": "Reddit-app image for deploy puma app",
+        "image_description": "Reddit-db image for deploy puma app",
         "network": "default",
         "tags": "puma-server",
         "disk_type": "pd-standard",
@@ -27,15 +27,8 @@
  "provisioners": [
         {
         "type": "shell",
-        "script": "script/install_ruby.sh",
-        "execute_command": "sudo {{.Path}}"
-        },
-
-        {
-        "type": "shell",
         "script": "script/install_mongodb.sh",
         "execute_command": "sudo {{.Path}}"
         }
-
         ]
 }
