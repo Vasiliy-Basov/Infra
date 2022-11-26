@@ -295,3 +295,227 @@ output "Global_Forwarding_Rule_IP" {
 }
 ```
 => Чтобы output-переменные генерировались для каждого созданного instance, после указания имени ресурса terraform, необходимо добавить .*. (google_compute_instance.app.*.) и в секции instances google_compute_target_pool убрать [].
+
+## HW 9 (terraform-2 - IaC in a team)
+
+### Импорт ресурсов из GCP
+Создаём копию уже определённого в GCP правила, разрешающего подключение по ssh:
+```
+resource "google_compute_firewall" "firewall_ssh" {
+  name = "default-allow-ssh"
+  network = "default"
+  priority = 65534
+  description = "Allow SSH from anywhere"
+  allow {
+    protocol = "tcp"
+    ports = ["22"]
+  }
+  source_ranges = var.source_ranges
+}
+```
+Т.к. в terraform state отсутствует информация о том, что правило уже применено, terraform apply завершится с ошибкой. Соответственно, нам необходимо вручную импортировать состояние:
+$ terraform import google_compute_firewall.firewall_ssh default-allow-ssh
+
+### Пример ссылки на атрибуты другого ресурса
+```
+resource "google_compute_address" "app_ip" {
+  name   = "reddit-app-ip"
+  region = var.region
+}
+```
+
+```
+  network_interface {
+    //[...]
+    access_config {
+      nat_ip = google_compute_address.app_ip.address
+    }
+  }
+```
+
+### Разбиение конфигурации по файлам / на модули
+```
+$ tree modules/app/
+modules/app/
+├── files
+│   ├── deploy.sh
+│   ├── puma.service
+│   └── set_env.sh
+├── main.tf
+├── outputs.tf
+└── variables.tf
+```
+
+```
+$ tree modules/db
+modules/db
+├── main.tf
+├── outputs.tf
+└── variables.tf
+```
+
+Интересные особенности:
+1. В модуль можно передавать значения для переменных;
+```
+module "db" {
+  source          = "../modules/db"
+  public_key_path = var.public_key_path
+  zone            = var.zone
+  db_disk_image   = var.db_disk_image
+}
+```
+
+2. Модуль может возвращать значения переменных:
+```
+variable "database_url" {
+  description = "database_url for reddit app"
+  default     = "127.0.0.1:27017"
+}
+```
+Соответственно, к ним можно обращаться извне:
+```
+database_url        = "${module.db.db_internal_ip}:27017"
+```
+
+После добавления конфигурации модуля, необходимо выполнить $ terraform get
+
+### Самостоятельное задание (стр. 24)
+Необходимо создать модуль vpc (+ параметризация).
+```
+resource "google_compute_firewall" "firewall_ssh" {
+  name = "default-allow-ssh"
+  network = "default"
+  priority = 65534
+  description = "Allow SSH from anywhere"
+  allow {
+    protocol = "tcp"
+    ports = ["22"]
+  }
+  //  source_ranges = ["0.0.0.0/0"]
+  source_ranges = var.source_ranges
+}
+
+
+resource "google_compute_project_metadata_item" "default" {
+  key = "ssh-keys"
+  value = "baggurd:${chomp(file(var.public_key))}"
+}
+```
+
+Настройте хранение стейт файла в удаленном бекенде (remote
+backends) для окружений stage и prod, используя Google Cloud
+Storage в качестве бекенда. Описание бекенда нужно вынести в
+отдельный файл backend.tf
+https://cloud.google.com/docs/terraform/resource-management/store-state
+https://developer.hashicorp.com/terraform/language/settings/backends/configuration
+
+Enable the Cloud Storage API:
+gcloud services enable storage.googleapis.com
+
+Создаем Bucket: (либо через модуль bucket-from-module)
+```
+# Это плагин который генерирует random id:
+resource "random_id" "bucket_prefix" {
+  byte_length = 8
+}
+
+resource "google_storage_bucket" "default" {
+  name          = "prod-bucket-${random_id.bucket_prefix.hex}"
+  force_destroy = false # не даст удалить bucket пока не удалим все внутренние объекты
+  location      = "EU" # https://cloud.google.com/storage/docs/locations
+  storage_class = "STANDARD" # Supported values include: STANDARD, MULTI_REGIONAL, REGIONAL, NEARLINE, COLDLINE, ARCHIVE
+  project = "infra-368512"
+  versioning {      # При изменении объекта старые версии сохраняются
+    enabled = true
+  }
+}
+
+```
+
+И создаем файл backend.tf 
+```
+# Указываем путь где мы будем хранить наш stage file
+terraform {
+ backend "gcs" {
+   bucket  = "prod-bucket-f1b000bd21bd4bbf" # имя нашего bucket
+   prefix  = "stage"
+ }
+}
+```
+
+Все, stage будет храниться в GCP Bucket
+
+При запуске terraform apply из двух разных директорий получаем Lock:
+
+<details>
+  <summary>state lock</summary>
+
+```bash
+│ Error: Error acquiring the state lock
+│
+│ Error message: writing "gs://prod-bucket-f1b000bd21bd4bbf/prod/default.tflock" failed: googleapi: Error 412: At least
+│ one of the pre-conditions you specified did not hold., conditionNotMet
+│ Lock Info:
+│   ID:        1669400526851245
+│   Path:      gs://prod-bucket-f1b000bd21bd4bbf/prod/default.tflock
+│   Operation: OperationTypeApply
+│   Who:       I5-2500K\baggu@i5-2500k
+│   Version:   1.3.5
+│   Created:   2022-11-25 18:23:59.7938099 +0000 UTC
+│   Info:
+│
+│
+│ Terraform acquires a state lock to protect the state from being written
+│ by multiple users at the same time. Please resolve the issue above and try
+│ again. For most commands, you can disable locking with the "-lock=false"
+│ flag, but this is not recommended.
+```
+</details>
+
+<details>
+  <summary>Задание с двумя звездочками:</summary>
+
+```bash
+В процессе перехода от конфигурации, созданной в
+предыдущем ДЗ к модулям мы перестали использовать provisioner
+для деплоя приложения. Соответственно, инстансы поднимаются
+без приложения.
+1. Добавьте необходимые provisioner в модули для деплоя и
+работы приложения. Файлы, используемые в provisioner, должны
+находится в директории модуля.
+2. Опционально можете реализовать отключение provisioner в
+зависимости от значения переменной
+3. Добавьте описание в README.md
+P.S. Приложение получает адрес БД из переменной
+окружения DATABASE_URL.
+```
+</details>
+
+1. По умолчанию, MongoDB слушает порт 27017 только на 127.0.0.1.
+Конфигурация базы лежит в etc/monog.conf
+
+Замена конфигурации в файле делаем с помощью редактора sed:
+```
+-i - означает что мы заменяем исходный файл 
+s в кавычках означает что мы производим замену тескта 127.0.0.1 на 0.0.0.0
+g в кавычках означает что sed заменит все совпадения в файле
+```
+
+```
+sudo sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mongod.conf
+```
+
+Приложение в процессе работы использует БД, указанную в переменной окружения DATABASE_URL, нам нужно создать эту переменную в app instance
+Команда export создает переменную для текущей оболочки и всех дочерних процессов так же помещаем переменную в ~/.profile
+```
+  provisioner "remote-exec" {
+  inline = [
+    "echo 'export DATABASE_URL=${var.db_internal_address}' >> ~/.profile", # 
+    "export DATABASE_URL=${var.db_internal_address}",
+    "sudo systemctl restart puma.service"
+    ]
+}
+```
+Если мы используем ip адреса одного модуля в другом и наоборот, то если адреса получать непосредственно из модулей то выдаст ошибку зацикленности
+Нужно сначала создать ip адреса и только потом инстансы. Можно сделать для этого новый модуль. Например intip
+

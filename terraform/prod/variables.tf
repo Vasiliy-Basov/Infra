@@ -36,3 +36,28 @@ variable "number_of_instances" {
   description = "Number of reddit-app instances (count)"
   default     = 1
 }
+
+variable "app_disk_image" {
+  description = "Disk image for reddit app"
+  default     = "reddit-app-base"
+}
+
+variable "db_disk_image" {
+  description = "Disk image for reddit db"
+  default     = "reddit-db-base"
+}
+
+variable "source_ranges" {
+  description = "The source ip address range for an environment"
+}
+
+variable "prod_or_stage" {
+  description = "Production or Stage Instances"
+  default     = "prod"
+}
+
+variable "ssh_user" {
+  type = string
+  # Значение переменной
+  # default = "baggurd"
+}
