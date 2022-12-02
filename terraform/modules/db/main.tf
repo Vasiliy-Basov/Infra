@@ -3,6 +3,9 @@ resource "google_compute_instance" "db" {
   machine_type = "g1-small"
   zone         = var.zone
   tags         = ["reddit-db"]
+  labels = {
+    ansible_group = "db"  # можем определить labels
+  }
   boot_disk {
     initialize_params {
       image = var.db_disk_image
