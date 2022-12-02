@@ -16,9 +16,9 @@ resource "google_compute_instance" "app" {
   boot_disk {
     initialize_params {
       image = var.app_disk_image # Также можно передать полное имя образа, например "reddit-base-1668709415"
-      #  labels = {
-      #    my_label = "value"  # можем определить labels
-      #  }
+        labels = {
+          ansible_group = "app"  # можем определить labels
+        }
     }
   }
 
