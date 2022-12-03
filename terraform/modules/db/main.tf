@@ -33,6 +33,7 @@ resource "google_compute_instance" "db" {
   # g в кавычках означает что sed заменит все совпадения в файле
   # Мы должны заменить на адрес network adapter-а сервера db
   provisioner "remote-exec" {
+    count = var.enable_provisioners ? 1 : 0
     inline = [
       "sudo sed -i 's/127.0.0.1/${var.internal_ip_db}/g' /etc/mongod.conf",
       "sudo systemctl restart mongod.service",

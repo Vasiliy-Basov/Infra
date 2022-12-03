@@ -40,3 +40,9 @@ variable "internal_ip_db" {
 variable "internal_ip_app" {
   description = "Static internal ip address"
 }
+
+variable "enable_provisioners" {
+  description = "If set to true, enable provisionigs"
+  type = bool
+  default = 1
+}

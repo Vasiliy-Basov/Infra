@@ -50,16 +50,19 @@ resource "google_compute_instance" "app" {
   #  }
   # Если хотим внести переменные в конфиг то заполняем наш конфиг построчно:
   provisioner "remote-exec" {
+    count = var.enable_provisioners ? 1 : 0
     inline = ["echo '[Unit]\nDescription=Puma HTTP Server\nAfter=network.target\n\n[Service]\nType=simple\nUser=${var.ssh_user}\nWorkingDirectory=/home/${var.ssh_user}/reddit\nExecStart=/bin/bash -lc 'puma'\nRestart=always\n\n[Install]\nWantedBy=multi-user.target' >> /tmp/puma.service"]
   }
   # Запускаем скрипт для деплоя нашего приложения а также копирование в папку etc/systemd/system/ нашего приложения чтобы оно работало как служба
   # ${path.module} - означает что наш путь до файла будет начинаться всегда из корня модуля, неважно где мы этот модуль запускаем
   provisioner "remote-exec" {
+    count = var.enable_provisioners ? 1 : 0
     script = "${path.module}/files/deploy.sh"
   }
   # Приложение в процессе работы использует БД, указанную в переменной окружения DATABASE_URL, нам нужно создать эту переменную
   # Команда export создает переменную для текущей оболочки и всех дочерних процессов так же помещаем переменную в ~/.profile
   provisioner "remote-exec" {
+    count = var.enable_provisioners ? 1 : 0
     inline = [
       "echo 'export DATABASE_URL=${var.internal_ip_db}' >> ~/.profile",
       "export DATABASE_URL=${var.internal_ip_db}",
