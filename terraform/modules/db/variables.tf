@@ -44,5 +44,5 @@ variable "internal_ip_db" {
 variable "enable_provisioners" {
   description = "If set to true, enable provisionigs"
   type = bool
-  default = 1
+  default = true
 }

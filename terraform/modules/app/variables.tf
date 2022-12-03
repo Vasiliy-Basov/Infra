@@ -42,7 +42,7 @@ variable "internal_ip_app" {
 }
 
 variable "enable_provisioners" {
-  description = "If set to true, enable provisionigs"
+  description = "If set to true, enable provisioners"
   type = bool
-  default = 1
+  default = true
 }

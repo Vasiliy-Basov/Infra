@@ -61,3 +61,9 @@ variable "ssh_user" {
   # Значение переменной
   # default = "baggurd"
 }
+
+variable "enable_provisioners" {
+  description = "If set to true, enable provisionigs"
+  type = bool
+  default = true
+}

@@ -27,3 +27,11 @@ output "internal_ip_db" {
 output "internal_ip_app" {
   value = module.intip.internal_ip_app
 }
+
+output "app_without_provisioning_external_ip" {
+  value = module.app.app_without_provisioning_external_ip
+}
+
+output "db_without_provisioning_external_ip" {
+  value = module.db.db_without_provisioning_external_ip
+}
