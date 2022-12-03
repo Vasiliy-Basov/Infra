@@ -28,6 +28,7 @@ module "app" {
   ssh_user        = var.ssh_user
   internal_ip_db  = module.intip.internal_ip_db
   internal_ip_app = module.intip.internal_ip_app
+  enable_provisioners = 1
 }
 
 module "db" {
@@ -39,6 +40,7 @@ module "db" {
   private_key    = var.private_key
   ssh_user       = var.ssh_user
   internal_ip_db = module.intip.internal_ip_db
+  enable_provisioners = 1
 }
 
 
