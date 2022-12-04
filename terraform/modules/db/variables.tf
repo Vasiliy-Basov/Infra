@@ -40,3 +40,9 @@ variable "internal_ip_db" {
   description = "Db Internal ip Address"
   default     = "0.0.0.0"
 }
+
+variable "enable_provisioners" {
+  description = "If set to true, enable provisionigs"
+  type = bool
+  default = true
+}

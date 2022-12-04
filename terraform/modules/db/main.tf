@@ -1,4 +1,6 @@
 resource "google_compute_instance" "db" {
+  # Создание ресурса в зависимости от переменной:
+  count = var.enable_provisioners ? 1 : 0
   name         = "reddit-db-${var.prod_or_stage}"
   machine_type = "g1-small"
   zone         = var.zone
@@ -43,6 +45,29 @@ resource "google_compute_instance" "db" {
   #  metadata = {
   #    ssh-keys = "baggurd:${chomp(file(var.public_key))}"
   #  }
+}
+
+resource "google_compute_instance" "db_without_provisioning" {
+  # Создание ресурса в зависимости от переменной:
+  count        = var.enable_provisioners ? 0 : 1
+  name         = "reddit-db-${var.prod_or_stage}"
+  machine_type = "g1-small"
+  zone         = var.zone
+  tags         = ["reddit-db"]
+  labels       = {
+    ansible_group = "db"  # можем определить labels
+  }
+  boot_disk {
+    initialize_params {
+      image = var.db_disk_image
+    }
+  }
+  network_interface {
+    network    = "default"
+    network_ip = var.internal_ip_db
+    access_config {}
+    # Если не хотим получать внешний ip то просто комментируем access_config
+  }
 }
 
 # Правило firewall для db

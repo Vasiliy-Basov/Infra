@@ -1,0 +1,7 @@
+---
+- name: Database MongoDB Install
+  ansible.builtin.import_playbook: db.yml
+- name: Application Install
+  ansible.builtin.import_playbook: app.yml
+- name: Deploy Application
+  ansible.builtin.import_playbook: deploy.yml
