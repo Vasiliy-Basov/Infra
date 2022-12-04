@@ -1,1 +1,12 @@
-ansible/*.retry
+*.tfstate
+*.tfstate.*.backup
+*.tfstate.backup
+*.tfvars
+*.retry
+*.lock.hcl
+.terraform/
+/terraform/ssh_keys/
+/venv/
+/.idea/
+.gitignore
+
