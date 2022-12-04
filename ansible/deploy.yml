@@ -1,0 +1,23 @@
+---
+- name: Deploy App
+  hosts: app
+#  tags: deploy-tag
+  become: true
+  tasks:
+    - name: Fetch the latest version of application code
+      ansible.builtin.git:
+        repo: 'https://github.com/express42/reddit.git'
+        dest: /home/baggurd/reddit
+        version: monolith # <-- Указываем нужную ветку
+      notify: Restart puma
+
+    - name: Bundle install # Управление зависимостями для ruby
+      community.general.bundler:
+        state: present
+        chdir: /home/baggurd/reddit # <-- В какой директории выполнить команду bundle
+
+  handlers:
+    - name: Restart puma # Перезагружаем Puma Service
+      ansible.builtin.systemd:
+        name: puma
+        state: restarted

@@ -663,3 +663,176 @@ timeout = 10
   }
 }
 ```
+
+## HW 11 (ansible-2)
+В данной работе мы опробовали:
+* применение jinja2 templates;
+* пробный прогон через опцию --check;
+* ограничение группы хостов, к которым применяется плейбук, через --limit <hosts> и --tags <tags>;
+* разбиение одного плейбука на несколько с последующим их объединением в один плейбук через import;
+* механизм notify /handlers;
+* установка софта и деплой приложения через Ansible (на смену bash-скриптам), в т.ч. в Packer.
+
+### Задание со * (стр. 69)
+Условия:
+Исследуйте возможности использования dynamic inventory для GCP (для этого есть не только gce.py ?).
+Использование динамического инвентори означает, что это должно быть отражено в ansible.cfg и плейбуках (т.е. они должны использовать выбранное решение)
+
+Решение:
+В целом, можно было использовать скрипт, разработанный для прошлого задания, dynamic_inventory.py, или gcp.py, но актуальная документация по Ansible рекомендует применение inventory plugin "gcp compute". Его гибкости вполне достаточно для текущих задач.
+
+Итак, настройка плагина (inventory.gcp.yml):
+```yaml
+plugin: gcp_compute
+projects:
+  - infra-368512
+zones:
+  - "europe-west1-b"
+scopes:
+- https://www.googleapis.com/auth/compute
+filters: []
+auth_kind: serviceaccount
+service_account_file: "/home/baggurd/packer.json"
+keyed_groups:
+  # <prefix><separator><key>
+  - prefix: ""
+    separator: ""
+    key: labels.ansible_group # Если у нас есть labels ansible_group то они попадут в inventory
+hostnames:
+  # List hosts by name instead of the default public ip
+  - name
+compose:
+  # Set an inventory parameter to use the Public IP address to connect to the host
+  # For Private ip use "networkInterfaces[0].networkIP"
+  ansible_host: networkInterfaces[0].accessConfigs[0].natIP
+```
+В целом, конфиг основан на:
+http://docs.testing.ansible.com/ansible/latest/plugins/inventory/gcp_compute.html
+с некоторыми дополнениями.
+https://medium.com/@Temikus/ansible-gcp-dynamic-inventory-2-0-7f3531b28434
+ansible-inventory --graph посмотреть наш инвентори
+
+Ключевые моменты:
+* Имя файла с конфигурацией должна заканчиваться на gcp_compute.(yml|yaml) или gcp.(yml|yaml), иначе возникнет ошибка;
+* Поскольку Ansible запускаем не из GCP, в секции compose собираем внешние IP-адреса;
+* Есть разные способы выстраивания inventory-файла, но наиболее подходящий нам - keyed_groups. Формат по умолчанию: <prefix><separator><key>
+  - prefix и separator приравниваем к "" (стандартное значение для separator - "_");
+  - в предыдущей домашней работе в качестве индикатора принадлежности к конкретной Ansible-группе я выбрал label "ansible_group", соответственно и в качестве параметра key теперь указываем "labels.ansible_group";
+* Для авторизации на GCP используется service account file в формате json (параметр service_account_file). Или см в GCP.doc создание сервисного аккаунта
+https://developers.google.com/identity/protocols/oauth2/service-account#creatinganaccount
+
+Изменения в ansible.cfg
+```ini
+[defaults]
+inventory = /home/baggurd/Infra/ansible/inventory.gcp.yml
+remote_user = baggurd
+private_key_file = ~/.ssh/id_rsa
+host_key_checking = False
+retry_files_enabled = False
+timeout = 10
+
+[inventory]
+enable_plugins = gcp_compute
+```
+### Самостоятельное задание (стр. 72)
+Задание:
+Опишите с помощью модулей Ansible в плейбуках ansible/packer_app.yml и ansible/packer_db.yml действия, аналогичные bash-скриптам, которые сейчас используются в нашей конфигурации Packer.
+
+packer_db.yml
+```
+---
+- name: Db mongodb install
+  hosts: all
+  become: true
+  tasks:
+    - name: Add apt key # Добавим ключ репозитория для последующей работы с ним
+      ansible.builtin.apt_key:
+        url: https://www.mongodb.org/static/pgp/server-3.2.asc
+        state: present
+    - name: Add mongoDB repository # Подключаем репозиторий с пакетами mongodb
+      ansible.builtin.apt_repository:
+        repo: deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse
+        state: present
+    - name: Install mongoDB
+      ansible.builtin.apt:
+        update_cache: true # аналогично команде apt update
+        cache_valid_time: 86400 # Один день
+        name: mongodb-org # Означает что мы будем перебирать все значения из loop
+        state: present
+
+    - name: Start mongod
+      ansible.builtin.systemd:
+        name: mongod
+        state: started
+        enabled: true
+```
+
+packer_app.yml
+
+```yaml
+---
+- name: Application requirements
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Ruby and Bundler
+      ansible.builtin.apt:
+        update_cache: true # аналогично команде apt update
+        cache_valid_time: 86400 # Один день
+        name: "{{ item | default('ruby-full') }}" # Означает что мы будем перебирать все значения из loop
+        state: present
+      loop:
+        - ruby-full
+        - ruby-bundler
+        - build-essential
+```
+Интересная особенность плейбука в том, что hosts нужно выставить равным all.
+
+Интеграция в Packer:
+app.json
+```json
+    "provisioners": [
+        {
+            "type": "ansible",
+            "playbook_file": "../ansible/packer_app.yml"
+        }
+    ]
+```
+db.json
+```json
+    "provisioners": [
+        {
+            "type": "ansible",
+            "playbook_file": "../ansible/packer_db.yml"
+        }
+    ]
+```
+
+### Extra work
+Поскольку у меня нет никакого желания каждый раз при деплое приложения вручную указывать IP-адрес instance с MongoDB, я подправил app.yml:
+```yaml
+- name: Gather facts from reddit-db-stage
+  hosts: db
+  tasks: []
+
+- name: Configure App
+  hosts: app
+  become: true
+  vars: # Собрать факты и посмотреть путь до ip адреса: $ ansible db -m setup
+    db_host: "{{ hostvars['reddit-db-stage']['ansible_default_ipv4']['address'] }}"
+
+```
+Поскольку мы заранее не знаем, каким будет IP-адрес instance с MongoDB, нам необходимо опираться на ansible facts, которые собираются в процессе выполнения плейбука. При этом, в одном из предыдущих заданий мы разбили один плейбук на множество, ограничив описание деплоя приложения группой хостов app, соответственно, на момент выполнения app.yaml в Ansible отсутствуют факты о db. В соответствии с рекомендацией, найденной на https://serverfault.com/questions/638507/how-to-access-host-variable-of-a-different-host-with-ansible, необходимо добавить пустое задание для db, чтобы форсировать сбор фактов:
+```yaml
+- name: Gather facts from reddit-db-stage # Собираем данные (факты) с reddit-db-stage для того чтобы каждый раз не вводить новый IP
+  hosts: db 
+  tasks: []
+```
+После этого можем использовать:
+```yaml
+- name: Configure App
+  hosts: app
+  become: true
+  vars: # Собрать факты и посмотреть путь до ip адреса: $ ansible db -m setup
+    db_host: "{{ hostvars['reddit-db-stage']['ansible_default_ipv4']['address'] }}"
+```
