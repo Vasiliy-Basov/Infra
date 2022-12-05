@@ -1,0 +1,15 @@
+// Из этих двух источников берем обновление дистра и безопасности
+Unattended-Upgrade::Allowed-Origins {
+  "${distro_id}:${distro_codename}";
+  "${distro_id}:${distro_codename}-security";
+// Если стоит переменная updates_full то к источникам добавь еще обновления которые приехали 
+{% if autoupdate_full %}
+  "${distro_id}:${distro_codename}-updates";
+{% endif %}
+};
+
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+Unattended-Upgrade::Automatic-Reboot "{{autoupdate_reboot|lower}}";
+Unattended-Upgrade::Automatic-Reboot-Time "{{autoupdate_reboot_time}}";;

@@ -1,0 +1,6 @@
+---
+# Описание переменных:
+autoupdate_enabled: true # this enables only security upgrades (обновления безопасности)
+autoupdate_full: false # this enables dist-upgrade automaticaly (обновления софта до актуального состояния) по умолчанию false
+autoupdate_reboot: false # Если нужна перезагрузка то перезагружаться автоматически по умолчанию false
+autoupdate_reboot_time: "03:00" # автоматически перезагружаться в 3:00 если нужна перезагрузка

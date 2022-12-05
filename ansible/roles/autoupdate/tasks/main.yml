@@ -1,0 +1,14 @@
+---
+# В директорию с конфигурацией apt мы кладем два новых файла при этом
+# их имена такие что они при сборе общего файла конфинурации apt окажутся в конце и будут иметь максимальный приоритет
+- name: Updates | configure autoupdate_enabled
+  ansible.builtin.template:
+    src: templates/91-ansible-apt.j2
+    dest: /etc/apt/apt.conf.d/91-ansible-apt
+    mode: 0644
+
+- name: Updates | configure unattended-upgrades
+  ansible.builtin.template:
+    src: templates/92-unattended.j2
+    dest: /etc/apt/apt.conf.d/92-unattended
+    mode: 0644

@@ -1,0 +1,13 @@
+---
+- name: Autoupdate db
+  hosts: db
+  gather_facts: true
+  roles:
+    - role: autoupdate
+      become: true
+      autoupdate_full: true
+      autoupdate_reboot: true
+      # Импортирванная роль для установки apache
+      # Для импорта вводим: ansible-galaxy install geerlingguy.apache для роли должны быть включены gather_facts
+    - role: geerlingguy.apache
+      become: true

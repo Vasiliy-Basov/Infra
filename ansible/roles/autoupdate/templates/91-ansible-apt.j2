@@ -1,0 +1,15 @@
+// this is enabled by default, but we specify it manually
+APT::Periodic:: "1";
+
+// Если переменная autoupdate_enabled true то записываем этот кусок
+{% if autoupdate_enabled %}
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+// Если false то этот кусок:
+{% else %}
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+{% endif %}
