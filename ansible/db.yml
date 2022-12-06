@@ -4,17 +4,7 @@
 #  tags: db-tag # тег нам больше не нужен
   become: true # Выполняем от root
   vars:
-    mongo_bind_ip: 0.0.0.0 # Переменная которая будет пременена в шаблоне Jinja
-  tasks:
-    - name: Change mongo config file
-      ansible.builtin.template:
-        src: templates/mongod.conf.j2 # <-- Путь до локального файла-шаблона
-        dest: /etc/mongod.conf # <-- Путь на удаленном хосте к файлу конфигурации который будет заменен шаблоном
-        mode: 0644 # <-- Права на файл, которые нужно установить
-      notify: Restart mongod # запустит handlers "restart mongod" если конфигурация изменится
+    mongo_bind_ip: 0.0.0.0 # Переменная которая будет применена в шаблоне Jinja
 
-  handlers: # <-- Добавим блок handlers и задачу для рестарта mongodb
-    - name: Restart mongod
-      ansible.builtin.systemd:
-        name: mongod
-        state: restarted
+  roles:
+    - db

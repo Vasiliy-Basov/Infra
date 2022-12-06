@@ -1,0 +1,20 @@
+---
+- name: Add unit file for Puma # Копируем puma service в systemd и перезапускаем service
+  ansible.builtin.copy:
+    src: puma.service # Достаточно указать имя а не полный путь
+    dest: /etc/systemd/system/puma.service
+    mode: 0644
+  notify: Reload puma # запустит handlers "reload puma" если конфигурация изменится
+
+- name: Add config for DB connection # добавляем переменную DATABASE_URL (ip адрес базы) в db_config для подключения к базе
+  ansible.builtin.template:
+    src: db_config.j2 # Достаточно указать имя а не полный путь
+    dest: /home/baggurd/db_config
+    mode: 0644
+    owner: baggurd
+    group: baggurd
+
+- name: Enable puma # Включаем Puma Service
+  ansible.builtin.systemd:
+    name: puma
+    enabled: true

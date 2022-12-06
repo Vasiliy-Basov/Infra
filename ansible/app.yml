@@ -9,29 +9,6 @@
   become: true
   vars: # Собрать факты и посмотреть путь до ip адреса: $ ansible db -m setup
     db_host: "{{ hostvars['reddit-db-stage']['ansible_default_ipv4']['address'] }}" # <-- Внутренний IP адрес нашего хоста с базой данных
-  tasks:
-    - name: Add unit file for Puma # Копируем puma service в systemd и перезапускаем service
-      ansible.builtin.copy:
-        src: files/puma.service
-        dest: /etc/systemd/system/puma.service
-        mode: 0644
-      notify: Reload puma # запустит handlers "reload puma" если конфигурация изменится
 
-    - name: Add config for DB connection # добавляем переменную DATABASE_URL (ip адрес базы) в db_config для подключения к базе
-      ansible.builtin.template:
-        src: templates/db_config.j2
-        dest: /home/baggurd/db_config
-        mode: 0644
-        owner: baggurd
-        group: baggurd
-
-    - name: Enable puma # Включаем Puma Service
-      ansible.builtin.systemd:
-        name: puma
-        enabled: true
-
-  handlers:
-    - name: Reload puma # Перезагружаем Puma Service
-      ansible.builtin.systemd:
-        name: puma
-        state: restarted
+  roles:
+    - app

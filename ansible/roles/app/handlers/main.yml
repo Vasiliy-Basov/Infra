@@ -1,0 +1,5 @@
+---
+- name: Reload puma # Перезагружаем Puma Service
+  ansible.builtin.systemd:
+    name: puma
+    state: restarted
