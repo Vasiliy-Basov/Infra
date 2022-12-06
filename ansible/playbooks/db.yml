@@ -3,8 +3,6 @@
   hosts: db
 #  tags: db-tag # тег нам больше не нужен
   become: true # Выполняем от root
-  vars:
-    mongo_bind_ip: 0.0.0.0 # Переменная которая будет применена в шаблоне Jinja
 
   roles:
     - db

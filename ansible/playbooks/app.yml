@@ -7,8 +7,7 @@
   hosts: app
 #  tags: app-tag
   become: true
-  vars: # Собрать факты и посмотреть путь до ip адреса: $ ansible db -m setup
-    db_host: "{{ hostvars['reddit-db-stage']['ansible_default_ipv4']['address'] }}" # <-- Внутренний IP адрес нашего хоста с базой данных
 
   roles:
     - app
+    - jdauphant.nginx

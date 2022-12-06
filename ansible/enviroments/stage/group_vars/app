@@ -1,0 +1,10 @@
+# Собрать факты и посмотреть путь до ip адреса: $ ansible db -m setup
+db_host: "{{ hostvars['reddit-db-stage']['ansible_default_ipv4']['address'] }}" # <-- Внутренний IP адрес нашего хоста с базой данных
+
+nginx_sites:
+  default:
+    - listen 80
+    - server_name "reddit"
+    - location / {
+        proxy_pass http://127.0.0.1:9292;
+      }
