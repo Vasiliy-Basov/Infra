@@ -5,3 +5,6 @@
   ansible.builtin.import_playbook: app.yml
 - name: Deploy Application
   ansible.builtin.import_playbook: deploy.yml
+- name: Add users from credentials.yml file
+  ansible.builtin.import_playbook: users.yml
+  

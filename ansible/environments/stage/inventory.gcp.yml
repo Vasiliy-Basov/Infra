@@ -9,7 +9,8 @@ zones:
   - "europe-west1-b"
 scopes:
 - https://www.googleapis.com/auth/compute
-filters: []
+filters:
+  - labels.env = stage # будем собирать inventory только для инстансов с меткой stage
 auth_kind: serviceaccount
 service_account_file: "/home/baggurd/packer.json"
 keyed_groups:
