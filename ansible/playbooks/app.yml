@@ -1,0 +1,13 @@
+---
+- name: Gather facts from reddit-db-stage # Собираем данные (факты) с reddit-db-stage для того чтобы каждый раз не вводить новый IP
+  hosts: db
+  tasks: []
+
+- name: Configure App
+  hosts: app
+#  tags: app-tag
+  become: true
+
+  roles:
+    - app
+    - jdauphant.nginx

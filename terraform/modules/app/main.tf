@@ -24,9 +24,10 @@ resource "google_compute_instance" "app" {
   name         = "reddit-app-${var.prod_or_stage}"
   machine_type = "g1-small"
   zone         = var.zone
-  tags         = ["reddit-app"] # можем определить теги
+  tags         = ["reddit-app", "http-server"] # можем определить теги если определяем тег http-server то gcp автоматически открывает порт 80
   labels = {
     ansible_group = "app"  # можем определить labels
+    env           = "${var.prod_or_stage}"
   }
 
   # определение загрузочного диска
@@ -98,9 +99,10 @@ resource "google_compute_instance" "app_without_provisioning" {
   name         = "reddit-app-${var.prod_or_stage}"
   machine_type = "g1-small"
   zone         = var.zone
-  tags         = ["reddit-app"] # можем определить теги
+  tags         = ["reddit-app", "http-server"] # можем определить теги если определяем тег http-server то gcp автоматически открывает порт 80
   labels       = {
-    ansible_group = "app"  # можем определить labels
+    ansible_group = "app"  # можем определить labels, определяем для того чтобы собирать dynamic inventory в ansible через переменную ansible_group
+    env           = "${var.prod_or_stage}" # делаем метку чтобы понимать наше окружение stage или prod для использования в ansible
   }
 
   # определение загрузочного диска

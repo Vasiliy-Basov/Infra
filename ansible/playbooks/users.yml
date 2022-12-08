@@ -1,0 +1,34 @@
+---
+- name: Create users
+  hosts: all
+  become: true
+
+# Файл зашифрован с помощью: $ vault ansible-vault encrypt environments/prod/credentials.yml
+# (файл с паролем в ansible key ~/.ansible/vault.key) путь до файла пароля указан в ansible.cfg
+# {{ inventory_dir }} это magic variable по умолчанию доступны в ansible и их нельзя поменять
+# {{ inventory_dir }} это директория где содержится инветори файл (в нашем случае inventory.gcp.yml) в котором впервые был определен inventory_hostname
+  vars_files:
+    - "{{ inventory_dir }}/credentials.yml"
+
+# Конструкция with_dict выполняет обход элементов словаря. При использова­нии этой конструкции переменная цикла iteм является словарем с двумя клю­чами:
+# key- один из ключей в словаре;
+# value - значение, соответствующее ключу key (key в нашем случае это имя пользователя, value значения password и groups).
+# Словарь у нас выглядит так:
+# credentials:
+#   users:
+#     admin:
+#       password: *******
+#       groups: sudo
+#     qauser:
+#       password: *******
+
+  tasks:
+    - name: Create users
+      ansible.builtin.user:
+        name: "{{ item.key }}"
+        # шифруем наш пароль с помощью алгоритма хеширования sha512,
+        # так как ansible.builtin.user module не позволяет устанавливать незашифрованные пароли пользователей:
+        password: "{{ item.value.password | password_hash('sha512', 65534 | random(seed=inventory_hostname) | string) }}"
+        # default(omit) означает что мы делаем эту переменную опциональной потому что по умолчанию ansible требует значения для всех переменных
+        groups: "{{ item.value.groups | default(omit) }}"
+      with_dict: "{{ credentials.users }}"

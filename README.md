@@ -836,3 +836,181 @@ db.json
   vars: # Собрать факты и посмотреть путь до ip адреса: $ ansible db -m setup
     db_host: "{{ hostvars['reddit-db-stage']['ansible_default_ipv4']['address'] }}"
 ```
+
+## HW#12 (ansible-3: Работа с ролями и окружениями)
+В данной работе мы сделали:
+* разбили ранее созданные плейбуки на роли (app, db);
+* разделили окружения на prod и env;
+* установили комьюнити-роль nginx;
+* опробовали применения Ansible Vault;
+* добавили поддержку окружения в dynamic inventory;
+* задали дополнительные тесты в TravisCI.
+
+### Самостоятельное задание (стр. 48)
+Задание:
+* Добавьте в конфигурацию Terraform открытие 80 порта для инстанса приложения
+* Добавьте вызов роли jdauphant.nginx в плейбук app.yml
+* Примените плейбук site.yml для окружения stage и проверьте, что приложение теперь доступно на 80 порту
+
+Решение:
+* Добавьте в конфигурацию Terraform открытие 80 порта для инстанса приложения
+В GCP, по умолчанию, существует правило, разрешающее доступ по http для instance с network tag "http-server". Соответственно, мы можем обойтись минимумом изменений в конфигурации terraform:
+modules/app/main.tf:
+```
+resource "google_compute_instance" "app" {
+  [...]
+  tags = ["reddit-app", "http-server"]
+  [...]
+}
+```
+* Добавьте вызов роли jdauphant.nginx в плейбук app.yml
+```yaml
+---
+#https://serverfault.com/questions/638507/how-to-access-host-variable-of-a-different-host-with-ansible
+- name: Gather facts from reddit-db
+  hosts: db
+  tasks: []
+
+- name: Configure App
+  hosts: app
+  become: true
+
+  roles:
+    - app
+    - jdauphant.nginx
+```
+
+* Примените плейбук site.yml для окружения stage и проверьте, что приложение теперь доступно на 80 порту
++
+
+### Задание со * (стр. 55) - Работа с динамическим инвентори
+Задание:
+Настройте использование динамического инвентори для окружений stage и prod.
+
+Решение:
+Тут всё довольно просто. Первым делом, нам нужно определить некий признак, по которому instance будет считаться частью соответствующего окружения (prod или stage). Им станет метка 'env', зададим её в конфигурации terraform:
+terraform/modules/app/variables.tf
+```json
+variable "prod_or_stage" {
+  description = "Production or Stage Instances"
+  default     = "stage"
+}
+
+```
+terraform/modules/app/main.tf
+```json
+resource "google_compute_instance" "app" {
+  [...]
+
+  labels       = {
+    ansible_group = "app"  # можем определить labels, определяем для того чтобы собирать dynamic inventory в ansible через переменную ansible_group
+    env           = "${var.prod_or_stage}" # делаем метку чтобы понимать наше окружение stage или prod для использования в ansible
+  }
+
+  [...]
+}
+```
+terraform/modules/db/variables.tf
+```json
+variable "prod_or_stage" {
+  description = "Production or Stage Instances"
+  default     = "stage"
+}
+```
+terraform/modules/db/main.tf
+```json
+resource "google_compute_instance" "db" {
+  [...]
+
+  labels       = {
+    ansible_group = "db"  # можем определить labels, определяем для того чтобы собирать dynamic inventory в ansible через переменную ansible_group
+    env           = "${var.prod_or_stage}"
+  }
+  [...]
+}
+```
+terraform/prod/variables.tf
+```json
+variable "prod_or_stage" {
+  description = "Production or Stage Instances"
+  default     = "prod"
+}
+```
+terraform/prod/terraform.tfvars
+```json
+prod_or_stage = "prod"
+```
+terraform/prod/main.tf
+```json
+module "app" {
+  [...]
+  prod_or_stage  = var.prod_or_stage
+}
+
+module "db" {
+  [...]
+  prod_or_stage  = var.prod_or_stage
+}
+
+```
+terraform/stage/variables.tf
+```json
+variable "prod_or_stage" {
+  description = "Production or Stage Instances"
+  default     = "stage"
+}
+```
+terraform/stage/terraform.tfvars
+```json
+prod_or_stage = "stage"
+```
+terraform/stage/main.tf
+```json
+module "app" {
+  [...]
+  prod_or_stage   = var.prod_or_stage
+}
+
+module "db" {
+  [...]
+  prod_or_stage   = var.prod_or_stage
+}
+
+```
+
+Теперь остаётся только добавить поддержку метки в конфигурацию inventory plugin в Ansible:
+ansible/environments/prod/inventory_gcp.yml
+```yaml
+filters:
+  - labels.env = prod
+``` 
+ansible/environments/stage/inventory_gcp.yml
+```yaml
+filters:
+  - labels.env = stage
+``` 
+
+Проверяем (для тестов я специально app поместил в stage, а db - в prod):
+```bash
+ibeliako@dev:~/devops/git/weisdd_infra/ansible$ gcloud compute instances describe reddit-app-0 | grep labels -A 2
+labels:
+  ansible_group: app
+  env: stage
+
+ibeliako@dev:~/devops/git/weisdd_infra/ansible$ ansible-inventory --graph
+@all:
+  |--@app:
+  |  |--reddit-app-0
+  |--@ungrouped:
+
+ibeliako@dev:~/devops/git/weisdd_infra/ansible$ gcloud compute instances describe reddit-db | grep labels -A 2
+labels:
+  ansible_group: db
+  env: prod
+  
+ibeliako@dev:~/devops/git/weisdd_infra/ansible$ ansible-inventory -i environments/prod/inventory_gcp.yml --graph
+@all:
+  |--@db:
+  |  |--reddit-db
+  |--@ungrouped:
+```

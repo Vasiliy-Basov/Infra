@@ -1,0 +1,8 @@
+---
+- name: Configure MongoDB
+  hosts: db
+#  tags: db-tag # тег нам больше не нужен
+  become: true # Выполняем от root
+
+  roles:
+    - db
