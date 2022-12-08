@@ -27,6 +27,7 @@ resource "google_compute_instance" "app" {
   tags         = ["reddit-app", "http-server"] # можем определить теги если определяем тег http-server то gcp автоматически открывает порт 80
   labels = {
     ansible_group = "app"  # можем определить labels
+    env           = "${var.prod_or_stage}"
   }
 
   # определение загрузочного диска

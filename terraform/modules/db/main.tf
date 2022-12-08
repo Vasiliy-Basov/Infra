@@ -7,6 +7,7 @@ resource "google_compute_instance" "db" {
   tags         = ["reddit-db"]
   labels = {
     ansible_group = "db"  # можем определить labels
+    env           = "${var.prod_or_stage}"
   }
   boot_disk {
     initialize_params {
