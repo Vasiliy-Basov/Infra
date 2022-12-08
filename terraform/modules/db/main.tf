@@ -56,6 +56,7 @@ resource "google_compute_instance" "db_without_provisioning" {
   tags         = ["reddit-db"]
   labels       = {
     ansible_group = "db"  # можем определить labels, определяем для того чтобы собирать dynamic inventory в ansible через переменную ansible_group
+    env           = "${var.prod_or_stage}"
   }
   boot_disk {
     initialize_params {
