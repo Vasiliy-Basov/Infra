@@ -1,0 +1,19 @@
+# Версия конфигурационного файла может быть 2 и 1 можно использовать нескольео версий в одном конфигурационном файле
+Vagrant.configure("2") do |config| 
+
+  config.vm.provider :virtualbox do |v| # Используем virtualbox
+    v.memory = 512 # количество памяти для виртуально машины
+  end
+
+  config.vm.define "dbserver" do |db|
+    db.vm.box = "ubuntu/xenial64" # название бокса (образа виртуальной машины)
+    db.vm.hostname = "dbserver" # имя виртуальной машины
+    db.vm.network :private_network, ip: "10.10.10.10" # ip адрес внутреннего интерфейса
+  end
+  
+  config.vm.define "appserver" do |app|
+    app.vm.box = "ubuntu/xenial64"
+    app.vm.hostname = "appserver"
+    app.vm.network :private_network, ip: "10.10.10.20"
+  end
+end
