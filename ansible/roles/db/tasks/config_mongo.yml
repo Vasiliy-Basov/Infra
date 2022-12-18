@@ -1,0 +1,7 @@
+---
+- name: Change mongo config file
+  ansible.builtin.template:
+    src: mongod.conf.j2 # Достаточно указать имя а не полный путь
+    dest: /etc/mongod.conf # <-- Путь на удаленном хосте к файлу конфигурации который будет заменен шаблоном
+    mode: 0644 # <-- Права на файл, которые нужно установить
+  notify: Restart mongod # запустит handlers "restart mongod" если конфигурация изменится
