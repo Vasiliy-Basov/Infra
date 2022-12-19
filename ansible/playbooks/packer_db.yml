@@ -3,23 +3,5 @@
   hosts: all
   become: true
   tasks:
-    - name: Add apt key # Добавим ключ репозитория для последующей работы с ним
-      ansible.builtin.apt_key:
-        url: https://www.mongodb.org/static/pgp/server-3.2.asc
-        state: present
-    - name: Add mongoDB repository # Подключаем репозиторий с пакетами mongodb
-      ansible.builtin.apt_repository:
-        repo: deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse
-        state: present
-    - name: Install mongoDB
-      ansible.builtin.apt:
-        update_cache: true # аналогично команде apt update
-        cache_valid_time: 86400 # Один день
-        name: mongodb-org # Означает что мы будем перебирать все значения из loop
-        state: present
-
-    - name: Start mongod
-      ansible.builtin.systemd:
-        name: mongod
-        state: started
-        enabled: true
+    - db
+    

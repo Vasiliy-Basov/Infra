@@ -3,13 +3,4 @@
   hosts: all
   become: true
   tasks:
-    - name: Install Ruby and Bundler
-      ansible.builtin.apt:
-        update_cache: true # аналогично команде apt update
-        cache_valid_time: 86400 # Один день
-        name: "{{ item | default('ruby-full') }}" # Означает что мы будем перебирать все значения из loop
-        state: present
-      loop:
-        - ruby-full
-        - ruby-bundler
-        - build-essential
+    - app

@@ -3,6 +3,7 @@ driver:
   name: vagrant
   provider:
     name: virtualbox
+lint: set -e ; yamllint . ; ansible-lint ; flake8
 platforms:
   - name: instance
     box: ubuntu/xenial64
