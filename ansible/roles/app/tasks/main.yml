@@ -7,6 +7,7 @@
 - name: Install Ruby
   ansible.builtin.include_tasks:
     file: ruby.yml
+  tags: ruby
 - name: Install Puma
   ansible.builtin.include_tasks:
     file: puma.yml
