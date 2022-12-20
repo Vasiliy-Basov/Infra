@@ -1,7 +1,8 @@
 ---
-- name: Db mongodb install
+- name: Configure MongoDB
   hosts: all
   become: true
-  tasks:
+
+  roles:
     - db
     

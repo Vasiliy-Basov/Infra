@@ -2,5 +2,5 @@
 - name: Application requirements
   hosts: all
   become: true
-  tasks:
+  roles:
     - app
