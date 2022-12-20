@@ -1133,3 +1133,180 @@ nginx_sites:
     end
   end
 ```
+### molecule & testinfra
+molecule позволяет автоматизировать тестирование ролей Ansible, выполняя при этом автоматический provisioning виртуальной машины и запуск линтеров. 
+После установки зависимостей (molecule, testinfra, python-vagrant) нам необходимо проинициализировать заготовки тестов в каталоге с ролью:
+```bash
+pipenv install molecule-vagrant
+ansible/roles/db$ molecule init scenario -r db -d vagrant
+```
+Здесь:
+-r <role>
+-d <driver>
+В результате получаем каталог molecule/default с соответствующими файлами:
+```bash
+weisdd_infra/ansible/roles/db$ tree molecule/
+molecule/
+└── default
+    ├── INSTALL.rst
+    ├── molecule.yml
+    ├── coverege.yml
+    ├── verify.yml
+    └── tests
+        └── test_default.py
+
+```
+db/molecule/default/molecule.yml - описание создаваемой в процессе тестирования виртуальной машины и применяемых линтеров:
+```yaml
+---
+dependency:
+  name: galaxy
+driver:
+  name: vagrant
+  provider:
+    name: virtualbox
+lint: set -e ; yamllint . ; ansible-lint ; flake8
+platforms:
+  - name: instance
+    box: ubuntu/xenial64
+provisioner:
+  name: ansible
+verifier:
+  name: testinfra
+
+```
+
+molecule/default/playook.yml
+```yaml
+---
+- name: Converge
+  become: true
+  hosts: all
+  vars:
+    mongo_bind_ip: 0.0.0.0
+  tasks:
+    - name: "Include db"
+      include_role:
+        name: "db"
+
+```
+Здесь мы задаём переменные и указываем роль, используемую в тестировании. При необходимости, указываем become. - В общем, вполне себе обычный плейбук.
+
+
+Создание машины:
+```bash
+$ molecule create
+```
+Вывод списка поднятых машин:
+```bash
+$ molecule list
+```
+Подключение к VM:
+```bash
+$ molecule login -h <host>
+$ molecule login -h instance
+```
+Note: instance - дефолтное имя в конфигурации molecule (db/molecule/default/molecule.yml).
+
+Применение плейбука:
+```bash
+$ molecule converge
+```
+
+Запуск тестов:
+```bash
+$ molecule verify
+```
+Note:
+  test         Test (lint, destroy, dependency, syntax,...)
+  verify       Run automated tests against instances.
+
+
+### Самостоятельное задание (стр. 62)
+Задание:
+Напишите тест к роли db для проверки того, что БД слушает по нужному порту (27017). Используйте для этого один из модулей Testinfra
+
+Решение:
+ansible/roles/db/molecule/default/tests/test_default.py
+```python
+# Проверка того что что БД слушает по нужному порту (27017)
+def test_mongo_listening(host):
+    assert host.socket("tcp://0.0.0.0:27017").is_listening
+```
+
+Задание:
+Используйте роли db и app в плейбуках packer_db.yml и packer_app.yml и убедитесь, что все работает как прежде (используйте теги для запуска только нужных тасков, теги указываются в шаблоне пакера).
+
+Решение:
+Из соответствующих плейбуков нужно удалить поэтапные инструкции по установке нужного софта и добавить подключение роли: 
+ansible/playbooks/packer_db.yml
+```yaml
+---
+- name: Install MongoDB
+  hosts: all
+  become: true
+  roles:
+    - db
+```
+ansible/playbooks/packer_app.yml
+```yaml
+---
+- name: Install Ruby, Bundler, build-essential
+  hosts: all
+  become: true
+  roles:
+    - app
+
+```
+
+Далее меняем описание provisioners в файлах с шаблонами packer:
+packer/db.json
+```json
+ "provisioners": [
+        {
+        "type": "ansible",
+        "playbook_file": "ansible/playbooks/packer_db.yml",
+        "ansible_env_vars": ["ANSIBLE_ROLES_PATH={{ pwd }}/ansible/roles"]
+        }
+        ]
+```
+packer/app.json
+```json
+ "provisioners": [
+       {
+        "type": "ansible",
+        "playbook_file": "ansible/playbooks/packer_app.yml",
+        "ansible_env_vars": ["ANSIBLE_ROLES_PATH={{ pwd }}/ansible/roles"],
+        "extra_arguments": ["--tags","ruby"]
+        }
+        ]
+```
+Здесь следует обратить внимание на две вещи:
+1. packer не в курсе, где лежит папка с ролями, поэтому нам необходимо явно задать путь через соответствующую переменную окружения:
+  "ansible_env_vars": ["ANSIBLE_ROLES_PATH={{ pwd }}/ansible/roles"]
+2. поскольку из всех задач, описанных в роли app, в контексте packer'а нас интересует только установка компонентов ruby, то необходимо воспользоваться тэгом "ruby". Его можно передать через параметр "extra_arguments":
+  "extra_arguments": ["--tags", "ruby"]
+
+Запускать Packer из каталога ansible
+
+Также  нужно поменять /ansible/roles/app/tasks/main.yml
+
+```json
+---
+# tasks file for app
+- name: Show info about the env this host belongs to
+  debug:
+    msg: "This host is in {{ env }} environment!!!"
+
+- name: Install Ruby
+  ansible.builtin.include_tasks:
+    file: ruby.yml
+  tags: ruby
+- name: Install Puma
+  ansible.builtin.include_tasks:
+    file: puma.yml
+```
+
+Запуск Packer -а
+packer build -var-file=packer/variables.json packer/app.json
+
