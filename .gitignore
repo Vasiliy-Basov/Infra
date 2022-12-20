@@ -10,3 +10,12 @@
 /.idea/
 .gitignore
 /ansible/.imported_roles
+/ansible/.venv/
+# Vagrant & molecule
+.vagrant/
+*.log
+*.pyc
+.molecule
+.cache
+.pytest_cache
+/packer/gce_googlecompute.pem
