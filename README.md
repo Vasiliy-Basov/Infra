@@ -739,7 +739,7 @@ enable_plugins = gcp_compute
 Опишите с помощью модулей Ansible в плейбуках ansible/packer_app.yml и ansible/packer_db.yml действия, аналогичные bash-скриптам, которые сейчас используются в нашей конфигурации Packer.
 
 packer_db.yml
-```
+```yaml
 ---
 - name: Db mongodb install
   hosts: all
